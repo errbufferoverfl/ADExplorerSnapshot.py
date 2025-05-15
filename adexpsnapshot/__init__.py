@@ -14,8 +14,8 @@ from bloodhound.ad.structures import LDAP_SID
 from frozendict import frozendict
 from bloodhound.enumeration.outputworker import OutputWorker
 
-from certipy.lib.constants import *
-from certipy.lib.security import ActiveDirectorySecurity, CertifcateSecurity as CertificateSecurity, CASecurity
+from certipy.lib import constants
+from certipy.lib.security import ActiveDirectorySecurity, CertificateSecurity as CertificateSecurity, CASecurity
 from certipy.commands.find import filetime_to_str
 from asn1crypto import x509
 
@@ -25,6 +25,7 @@ import queue, threading
 import datetime
 from enum import Enum
 from typing import List
+
 
 class ADExplorerSnapshot(object):
     OutputMode = Enum('OutputMode', ['BloodHound', 'Objects'])
@@ -101,7 +102,7 @@ class ADExplorerSnapshot(object):
 
             fh_out.close()
             result_q.task_done()
-            
+
         wq = queue.Queue()
         results_worker = threading.Thread(target=write_worker, args=(wq, os.path.join(self.output, outputfile)))
         results_worker.daemon = True
@@ -114,7 +115,7 @@ class ADExplorerSnapshot(object):
             wq.put((dict(obj.attributes.data)))
 
             if self.log and self.log.term_mode:
-                prog.status(f"dumped {idx+1}/{self.snap.header.numObjects} objects")
+                prog.status(f"dumped {idx + 1}/{self.snap.header.numObjects} objects")
 
         if self.log:
             prog.success(f"dumped {self.snap.header.numObjects} objects")
@@ -179,16 +180,16 @@ class ADExplorerSnapshot(object):
 
     # build caches: guidmap, domains, forest_domains, computers
     def preprocess(self):
-        for k,cl in self.snap.classes.items():
+        for k, cl in self.snap.classes.items():
             self.objecttype_guid_map[k] = str(cl.schemaIDGUID)
 
-        for k,idx in self.snap.propertyDict.items():
+        for k, idx in self.snap.propertyDict.items():
             self.objecttype_guid_map[k] = str(self.snap.properties[idx].schemaIDGUID)
 
         if self.log:
             prog = self.log.progress("Preprocessing objects", rate=0.1)
 
-        for idx,obj in enumerate(self.snap.objects):
+        for idx, obj in enumerate(self.snap.objects):
 
             # create sid cache
             objectSid = ADUtils.get_entry_property(obj, 'objectSid')
@@ -202,7 +203,7 @@ class ADExplorerSnapshot(object):
 
             # get domains
             if 'domain' in obj.classes:
-                if self.rootdomain is not None: # is it possible to find multiple?
+                if self.rootdomain is not None:  # is it possible to find multiple?
                     if self.log:
                         self.log.warn("Multiple domains in snapshot(?)")
                 else:
@@ -235,7 +236,7 @@ class ADExplorerSnapshot(object):
                 self.domaincontrollers.append(idx)
 
             if self.log and self.log.term_mode:
-                prog.status(f"{idx+1}/{self.snap.header.numObjects} ({len(self.sidcache)} sids, {len(self.computersidcache)} computers, {len(self.domains)} domains with {len(self.domaincontrollers)} DCs)")
+                prog.status(f"{idx + 1}/{self.snap.header.numObjects} ({len(self.sidcache)} sids, {len(self.computersidcache)} computers, {len(self.domains)} domains with {len(self.domaincontrollers)} DCs)")
 
         if self.log:
             prog.success(f"{len(self.sidcache)} sids, {len(self.computersidcache)} computers, {len(self.domains)} domains with {len(self.domaincontrollers)} DCs")
@@ -259,19 +260,19 @@ class ADExplorerSnapshot(object):
                     btype = "templates"
                 elif ptype.endswith("ly4k_cas"):
                     btype = "cas"
-            
+
             results_worker = threading.Thread(target=OutputWorker.membership_write_worker, args=(self.writeQueues[ptype], btype, os.path.join(self.output, f"{self.snap.header.server}_{self.snap.header.filetimeUnix}_{ptype}.json")))
             results_worker.daemon = True
             results_worker.start()
 
-        for idx,obj in enumerate(self.snap.objects):
+        for idx, obj in enumerate(self.snap.objects):
             for fun in [self.processUsers, self.processComputers, self.processGroups, self.processTrusts, self.processCertTemplates, self.processCAs]:
                 ret = fun(obj)
                 if ret:
                     break
 
             if self.log and self.log.term_mode:
-                prog.status(f"{idx+1}/{self.snap.header.numObjects} ({self.numUsers} users, {self.numGroups} groups, {self.numComputers} computers, {self.numCertTemplates} certtemplates, {self.numCAs} CAs, {self.numTrusts} trusts)")
+                prog.status(f"{idx + 1}/{self.snap.header.numObjects} ({self.numUsers} users, {self.numGroups} groups, {self.numComputers} computers, {self.numCertTemplates} certtemplates, {self.numCAs} CAs, {self.numTrusts} trusts)")
 
         if self.log:
             prog.success(f"{self.numUsers} users, {self.numGroups} groups, {self.numComputers} computers, {self.numCertTemplates} certtemplates, {self.numCAs} CAs, {self.numTrusts} trusts")
@@ -435,7 +436,7 @@ class ADExplorerSnapshot(object):
             try:
                 sid = self.computersidcache[target]
                 delegateObj = {
-                    "ObjectIdentifier":sid,
+                    "ObjectIdentifier": sid,
                     "ObjectType": self.resolve_sid(sid)['ObjectType']
                 }
                 computer['AllowedToDelegate'].append(delegateObj)
@@ -443,12 +444,11 @@ class ADExplorerSnapshot(object):
                 if '.' in target:
                     self.log.warn('Unable to find sid for delegation target: %s', host)
                     # TODO: figure out what to do here
-                    #computer['AllowedToDelegate'].append(target.upper())
+                    # computer['AllowedToDelegate'].append(target.upper())
                     pass
         # deprecated
-        #if len(delegatehosts) > 0:
+        # if len(delegatehosts) > 0:
         #    props['allowedtodelegate'] = delegatehosts
-
 
         # Process resource-based constrained delegation
         aces = self.parse_acl(computer, 'computer', ADUtils.get_entry_property(entry, 'msDS-AllowedToActOnBehalfOfOtherIdentity', raw=True))
@@ -481,61 +481,61 @@ class ADExplorerSnapshot(object):
         object_identifier = ADUtils.get_entry_property(entry, 'objectGUID')
         validity_period = filetime_to_str(ADUtils.get_entry_property(entry, 'pKIExpirationPeriod'))
         renewal_period = filetime_to_str(ADUtils.get_entry_property(entry, 'pKIOverlapPeriod'))
-        
+
         certificate_name_flag = ADUtils.get_entry_property(entry, 'msPKI-Certificate-Name-Flag', 0)
-        certificate_name_flag = MS_PKI_CERTIFICATE_NAME_FLAG(int(certificate_name_flag))
+        certificate_name_flag = constants.CertificateNameFlag(int(certificate_name_flag))
 
         enrollment_flag = ADUtils.get_entry_property(entry, 'msPKI-Enrollment-Flag', 0)
-        enrollment_flag = MS_PKI_ENROLLMENT_FLAG(int(enrollment_flag))
+        enrollment_flag = constants.EnrollmentFlag(int(enrollment_flag))
 
         authorized_signatures_required = int(ADUtils.get_entry_property(entry, 'msPKI-RA-Signature', 0))
 
         application_policies = ADUtils.get_entry_property(entry, 'msPKI-RA-Application-Policies', raw=True, default=[])
         application_policies = list(
             map(
-                lambda x: OID_TO_STR_MAP[x] if x in OID_TO_STR_MAP else x,
+                lambda x: constants.OID_TO_STR_MAP[x] if x in constants.OID_TO_STR_MAP else x,
                 application_policies,
             )
         )
 
         extended_key_usage = ADUtils.get_entry_property(entry, "pKIExtendedKeyUsage", default=[])
         extended_key_usage = list(
-            map(lambda x: OID_TO_STR_MAP[x] if x in OID_TO_STR_MAP else x, extended_key_usage)
+            map(lambda x: constants.OID_TO_STR_MAP[x] if x in constants.OID_TO_STR_MAP else x, extended_key_usage)
         )
 
         client_authentication = (
-            any(
-                eku in extended_key_usage
-                for eku in [
-                    "Client Authentication",
-                    "Smart Card Logon",
-                    "PKINIT Client Authentication",
-                    "Any Purpose",
-                ]
-            )
-            or len(extended_key_usage) == 0
+                any(
+                    eku in extended_key_usage
+                    for eku in [
+                        "Client Authentication",
+                        "Smart Card Logon",
+                        "PKINIT Client Authentication",
+                        "Any Purpose",
+                    ]
+                )
+                or len(extended_key_usage) == 0
         )
 
         enrollment_agent = (
-            any(
-                eku in extended_key_usage
-                for eku in [
-                    "Certificate Request Agent",
-                    "Any Purpose",
-                ]
-            )
-            or len(extended_key_usage) == 0
+                any(
+                    eku in extended_key_usage
+                    for eku in [
+                        "Certificate Request Agent",
+                        "Any Purpose",
+                    ]
+                )
+                or len(extended_key_usage) == 0
         )
 
         enrollee_supplies_subject = any(
             flag in certificate_name_flag
             for flag in [
-                MS_PKI_CERTIFICATE_NAME_FLAG.ENROLLEE_SUPPLIES_SUBJECT,
+                constants.CertificateNameFlag.ENROLLEE_SUPPLIES_SUBJECT,
             ]
         )
 
         requires_manager_approval = (
-            MS_PKI_ENROLLMENT_FLAG.PEND_ALL_REQUESTS in enrollment_flag
+                constants.EnrollmentFlag.PEND_ALL_REQUESTS in enrollment_flag
         )
 
         security = CertificateSecurity(ADUtils.get_entry_property(entry, "nTSecurityDescriptor", raw=True))
@@ -543,44 +543,44 @@ class ADExplorerSnapshot(object):
 
         certtemplate = {
             'Properties': {
-              'highvalue': (
-                enabled
-                and any(
-                  [
-                    all(
-                      [
-                        enrollee_supplies_subject,
-                        not requires_manager_approval,
-                        client_authentication,
-                      ]
-                    ),
-                    all([enrollment_agent, not requires_manager_approval]),
-                  ]
+                'highvalue': (
+                        enabled
+                        and any(
+                    [
+                        all(
+                            [
+                                enrollee_supplies_subject,
+                                not requires_manager_approval,
+                                client_authentication,
+                            ]
+                        ),
+                        all([enrollment_agent, not requires_manager_approval]),
+                    ]
                 )
-              ),
-            'name': "%s@%s"
-            % (
-              ADUtils.get_entry_property(entry, "CN").upper(),
-              self.domainname.upper()
-            ),
-            'type': 'Certificate Template',
-            'domain': self.domainname.upper(),
-            'Template Name': ADUtils.get_entry_property(entry, 'CN'),
-            'Display Name': ADUtils.get_entry_property(entry, 'displayName'),
-            'Client Authentication': client_authentication,
-            'Enrollee Supplies Subject': enrollee_supplies_subject,
-            'Extended Key Usage': extended_key_usage,
-            'Requires Manager Approval': requires_manager_approval,
-            'Validity Period': validity_period,
-            'Renewal Period': renewal_period,
-            'Certificate Name Flag': certificate_name_flag.to_str_list(),
-            'Enrollment Flag': enrollment_flag.to_str_list(),
-            'Authorized Signatures Required': authorized_signatures_required,
-            'Application Policies': application_policies,
-            'Enabled': enabled,
-            'Certificate Authorities': list(self.certtemplates[name]),
-            },          
-            'ObjectIdentifier': object_identifier.lstrip("{").rstrip("}"), 
+                ),
+                'name': "%s@%s"
+                        % (
+                            ADUtils.get_entry_property(entry, "CN").upper(),
+                            self.domainname.upper()
+                        ),
+                'type': 'Certificate Template',
+                'domain': self.domainname.upper(),
+                'Template Name': ADUtils.get_entry_property(entry, 'CN'),
+                'Display Name': ADUtils.get_entry_property(entry, 'displayName'),
+                'Client Authentication': client_authentication,
+                'Enrollee Supplies Subject': enrollee_supplies_subject,
+                'Extended Key Usage': extended_key_usage,
+                'Requires Manager Approval': requires_manager_approval,
+                'Validity Period': validity_period,
+                'Renewal Period': renewal_period,
+                'Certificate Name Flag': certificate_name_flag.to_str_list(),
+                'Enrollment Flag': enrollment_flag.to_str_list(),
+                'Authorized Signatures Required': authorized_signatures_required,
+                'Application Policies': application_policies,
+                'Enabled': enabled,
+                'Certificate Authorities': list(self.certtemplates[name]),
+            },
+            'ObjectIdentifier': object_identifier.lstrip("{").rstrip("}"),
             'Aces': aces,
         }
 
@@ -592,15 +592,15 @@ class ADExplorerSnapshot(object):
     def processCAs(self, entry):
         if not 'pkienrollmentservice' in entry.classes:
             return
-        
+
         name = ADUtils.get_entry_property(entry, 'name')
         if not name:
             return
-        
+
         object_identifier = ADUtils.get_entry_property(entry, 'objectGUID')
-        ca_name = ADUtils.get_entry_property(entry, 'cn') 
+        ca_name = ADUtils.get_entry_property(entry, 'cn')
         dns_name = ADUtils.get_entry_property(entry, 'dNSHostName')
-       
+
         subject_name = ADUtils.get_entry_property(entry, 'cACertificateDN')
 
         ca_certificate = x509.Certificate.load(
@@ -617,29 +617,29 @@ class ADExplorerSnapshot(object):
         aces = self.ca_security_to_bloodhound_aces(security)
 
         cas = {
-                "Properties": {
-                    "highvalue": True,
-                    "name": "%s@%s"
-                    % (
-                        name.upper(),
-                        self.domainname.upper(),
-                    ),
-                    "domain": self.domainname.upper(),
-                    "type": "Enrollment Service",
-                    "CA Name": ca_name,
-                    "DNS Name": dns_name,
-                    "Certificate Subject": subject_name,
-                    "Certificate Serial Number": serial_number,
-                    "Certificate Validity Start": validity_start,
-                    "Certificate Validity End": validity_end,
-                    # the below values cannot be obtained from ADExplorer
-                    "Web Enrollment": "",
-                    "User Specified SAN" : "",
-                    "Request Disposition" : "",
-                },
-                "ObjectIdentifier": object_identifier.lstrip("{").rstrip("}"),
-                "Aces": aces,
-            }
+            "Properties": {
+                "highvalue": True,
+                "name": "%s@%s"
+                        % (
+                            name.upper(),
+                            self.domainname.upper(),
+                        ),
+                "domain": self.domainname.upper(),
+                "type": "Enrollment Service",
+                "CA Name": ca_name,
+                "DNS Name": dns_name,
+                "Certificate Subject": subject_name,
+                "Certificate Serial Number": serial_number,
+                "Certificate Validity Start": validity_start,
+                "Certificate Validity End": validity_end,
+                # the below values cannot be obtained from ADExplorer
+                "Web Enrollment": "",
+                "User Specified SAN": "",
+                "Request Disposition": "",
+            },
+            "ObjectIdentifier": object_identifier.lstrip("{").rstrip("}"),
+            "Aces": aces,
+        }
 
         self.numCAs += 1
         self.writeQueues["cert_bh"].put(cas)
@@ -650,9 +650,9 @@ class ADExplorerSnapshot(object):
         if 'trusteddomain' not in entry.classes:
             return
 
-        domtrust = ADDomainTrust(ADUtils.get_entry_property(entry, 'name'), ADUtils.get_entry_property(entry, 'trustDirection'), ADUtils.get_entry_property(entry, 'trustType'), 
-                                ADUtils.get_entry_property(entry, 'trustAttributes'), ADUtils.get_entry_property(entry, 'securityIdentifier'))
-        
+        domtrust = ADDomainTrust(ADUtils.get_entry_property(entry, 'name'), ADUtils.get_entry_property(entry, 'trustDirection'), ADUtils.get_entry_property(entry, 'trustType'),
+                                 ADUtils.get_entry_property(entry, 'trustAttributes'), ADUtils.get_entry_property(entry, 'securityIdentifier'))
+
         trust = domtrust.to_output()
         self.numTrusts += 1
         self.trusts.append(trust)
@@ -753,7 +753,7 @@ class ADExplorerSnapshot(object):
 
         MembershipEnumerator.add_user_properties(user, entry)
 
-        if 'allowedtodelegate' in user['Properties']: 
+        if 'allowedtodelegate' in user['Properties']:
             for host in user['Properties']['allowedtodelegate']:
                 try:
                     target = host.split('/')[1]
@@ -763,14 +763,14 @@ class ADExplorerSnapshot(object):
                 try:
                     sid = self.computersidcache[target]
                     delegateObj = {
-                        "ObjectIdentifier":sid,
+                        "ObjectIdentifier": sid,
                         "ObjectType": self.resolve_sid(sid)['ObjectType']
                     }
-                    
+
                     user['AllowedToDelegate'].append(delegateObj)
                 except KeyError:
                     self.log.warn('Unable to find sid for delegation target: %s', host)
-                    #if '.' in target:
+                    # if '.' in target:
                     #    user['AllowedToDelegate'].append(target.upper())
                     # TODO: Figure out what to do here
                     pass
@@ -830,8 +830,8 @@ class ADExplorerSnapshot(object):
 
     # CacheInfo(hits=633024, misses=19340, maxsize=4096, currsize=4096)
     @functools.lru_cache(maxsize=4096)
-    def _parse_acl_cached(self, parselaps, entrytype, acl): 
-        fake_entry = {"Properties":{"haslaps": True if parselaps else False}} 
+    def _parse_acl_cached(self, parselaps, entrytype, acl):
+        fake_entry = {"Properties": {"haslaps": True if parselaps else False}}
         _, aces = parse_binary_acl(fake_entry, entrytype, acl, self.objecttype_guid_map)
 
         # freeze result so we can cache it for resolve_aces function
@@ -859,7 +859,7 @@ class ADExplorerSnapshot(object):
             except KeyError:
                 entry = {
                     'type': 'Unknown',
-                    'principal':sid
+                    'principal': sid
                 }
 
             resolved_entry = ADUtils.resolve_ad_entry(entry)
@@ -880,7 +880,6 @@ class ADExplorerSnapshot(object):
             "ObjectType": resolved_entry['type'].capitalize()
         }
 
-
     def write_default_users(self):
         user = {
             "AllowedToDelegate": [],
@@ -900,7 +899,6 @@ class ADExplorerSnapshot(object):
             "IsACLProtected": False,
         }
         self.writeQueues["users"].put(user)
-
 
     def write_default_groups(self):
         group = {
@@ -977,8 +975,6 @@ class ADExplorerSnapshot(object):
         }
         self.writeQueues["groups"].put(iugroup)
 
-
-
     def security_to_bloodhound_aces(self, security: ActiveDirectorySecurity) -> List:
         aces = []
         principal_type = ""
@@ -1009,8 +1005,6 @@ class ADExplorerSnapshot(object):
         for sid, rights in security.aces.items():
             principal = sid
             principal_type = ""
-
-
 
             if sid in ADUtils.WELLKNOWN_SIDS:
                 principal = u'%s-%s' % (self.domainname.upper(), sid)
@@ -1048,17 +1042,16 @@ class ADExplorerSnapshot(object):
                     {
                         "PrincipalSID": principal,
                         "PrincipalType": principal_type,
-                        "RightName": EXTENDED_RIGHTS_MAP[extended_right].replace(
+                        "RightName": constants.EXTENDED_RIGHTS_MAP[extended_right].replace(
                             "-", ""
                         )
-                        if extended_right in EXTENDED_RIGHTS_MAP
+                        if extended_right in constants.EXTENDED_RIGHTS_MAP
                         else extended_right,
                         "IsInherited": False,
                     }
                 )
 
         return aces
-
 
     def ca_security_to_bloodhound_aces(self, security: ActiveDirectorySecurity) -> List:
         aces = []
@@ -1086,7 +1079,6 @@ class ADExplorerSnapshot(object):
                 standard_rights = list(rights["rights"])
             except:
                 standard_rights = rights["rights"].to_list()
-            
 
             for right in standard_rights:
                 if not principal_type == "Computer":
@@ -1106,10 +1098,10 @@ class ADExplorerSnapshot(object):
                     {
                         "PrincipalSID": principal,
                         "PrincipalType": principal_type,
-                        "RightName": EXTENDED_RIGHTS_MAP[extended_right].replace(
+                        "RightName": constants.EXTENDED_RIGHTS_MAP[extended_right].replace(
                             "-", ""
                         )
-                        if extended_right in EXTENDED_RIGHTS_MAP
+                        if extended_right in constants.EXTENDED_RIGHTS_MAP
                         else extended_right,
                         "IsInherited": False,
                     }
@@ -1117,8 +1109,8 @@ class ADExplorerSnapshot(object):
 
         return aces
 
-def main():
 
+def main():
     parser = argparse.ArgumentParser(add_help=True, description='AD Explorer snapshot ingestor for BloodHound', formatter_class=argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument('snapshot', type=argparse.FileType('rb'), help="Path to the snapshot .dat file.")
@@ -1142,12 +1134,12 @@ def main():
         except:
             log.error(f"Unable to create output directory '{args.output}'.")
             return
-    
+
     if not os.path.isdir(args.output):
         log.warn(f"Path '{args.output}' does not exist or is not a folder.")
         parser.print_help()
         return
-    
+
     ades = ADExplorerSnapshot(args.snapshot, args.output, log)
 
     outputmode = ADExplorerSnapshot.OutputMode[args.mode]
@@ -1155,6 +1147,7 @@ def main():
         ades.outputBloodHound()
     if outputmode == ADExplorerSnapshot.OutputMode.Objects:
         ades.outputObjects()
+
 
 if __name__ == '__main__':
     main()
